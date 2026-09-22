@@ -1,4 +1,4 @@
-# Hacker's Bar @ Onarimon PIANOMA
+# Hacker's salon @ Onarimon PIANOMA
 
 お酒とAIとコードが交差する、大人のためのハッカーズバー。  
 御成門「PIANOMA」を拠点に開催される技術・AI交流イベントの運営リポジトリです。

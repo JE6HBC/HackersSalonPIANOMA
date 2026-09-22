@@ -10,7 +10,7 @@ const awardById = new Map(awards.map((a) => [a.id, a.data] as const));
 const hallOfFame = await getHallOfFame();
 ---
 
-<BaseLayout title="殿堂" description="Hacker's Bar @ PIANOMA の受賞歴アーカイブ。">
+<BaseLayout title="殿堂" description="Hacker's salon @ PIANOMA の受賞歴アーカイブ。">
   <h1>殿堂 / Hall of Fame</h1>
   <p class="muted">
     各回の <code>results.json</code> を集計しています。受賞の記録漏れを見つけたら Pull Requestで直してください。

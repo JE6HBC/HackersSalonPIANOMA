@@ -16,7 +16,7 @@
 | 項目                                       | 型                                                          | 必須 | 説明                                        |
 | :----------------------------------------- | :---------------------------------------------------------- | :--: | :------------------------------------------ |
 | `id`                                       | `YYYY-MM-DD`                                                |  ●   | ディレクトリ名と一致すること                |
-| `title`                                    | string                                                      |  ●   | `Hacker's Bar @ PIANOMA vol.7` など         |
+| `title`                                    | string                                                      |  ●   | `Hacker's salon @ PIANOMA vol.7` など       |
 | `status`                                   | `draft` / `upcoming` / `ongoing` / `archived` / `cancelled` |  ●   | `draft` はサイトに出ない                    |
 | `date`                                     | `YYYY-MM-DD`                                                |  ●   | `id` と一致すること                         |
 | `doorsOpenAt` / `startAt` / `endAt`        | `HH:MM`                                                     |  ●   | 24時間表記。深夜は `25:00` ではなく `01:00` |

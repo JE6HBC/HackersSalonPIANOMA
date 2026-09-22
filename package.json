@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Hacker's Bar @ Onarimon PIANOMA — イベント運営サイト / 会場サイネージ / AI課題DB",
+  "description": "Hacker's salon @ Onarimon PIANOMA — イベント運営サイト / 会場サイネージ / AI課題DB",
   "engines": {
     "node": ">=22"
   },

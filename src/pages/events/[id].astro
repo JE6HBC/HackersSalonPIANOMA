@@ -1,0 +1,264 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getChallengeIndex, getEventBundle } from '../../lib/data';
+import { formatDate, formatMinutes, STATUS_LABELS } from '../../lib/format';
+import { href } from '../../lib/url';
+
+export async function getStaticPaths() {
+  const events = await getCollection('events', ({ data }) => data.status !== 'draft');
+  return events.map((event) => ({ params: { id: event.id } }));
+}
+
+const { id } = Astro.params;
+const bundle = await getEventBundle(id!);
+if (!bundle.event) {
+  return Astro.redirect(href('/events'));
+}
+
+const event = bundle.event;
+const { participants, tables, tournament, results, report } = bundle;
+const awards = await getCollection('awards');
+const awardById = new Map(awards.map((a) => [a.id, a.data] as const));
+const participantById = new Map(participants.map((p) => [p.id, p] as const));
+const Content = report ? (await render(report)).Content : null;
+
+const checkedIn = participants.filter((p) => p.status === 'checked-in').length;
+const challengeById = await getChallengeIndex();
+---
+
+<BaseLayout title={event.data.title} description={event.data.summary}>
+  <p><a href={href('/events')}>← 開催一覧へ</a></p>
+
+  <header class="stack event-head">
+    <span class="badge" data-tone={event.data.status === 'upcoming' ? 'upcoming' : undefined}>
+      {STATUS_LABELS[event.data.status]}
+    </span>
+    <h1>{event.data.title}</h1>
+    <p class="event-head__date">{formatDate(event.data.date)}</p>
+    <p class="muted">{event.data.summary}</p>
+    <dl class="facts">
+      <div>
+        <dt>時間</dt>
+        <dd>{event.data.doorsOpenAt} 開場 / {event.data.startAt}–{event.data.endAt}</dd>
+      </div>
+      <div>
+        <dt>会場</dt>
+        <dd>
+          {event.data.venue.name}<br /><span class="dim">{event.data.venue.nearestStation}</span>
+        </dd>
+      </div>
+      <div><dt>定員</dt><dd>{event.data.capacity}名</dd></div>
+      {
+        event.data.fee && (
+          <div>
+            <dt>参加費</dt>
+            <dd>
+              {event.data.fee.amount.toLocaleString()}円
+              {event.data.fee.note && <span class="dim"> / {event.data.fee.note}</span>}
+            </dd>
+          </div>
+        )
+      }
+      <div>
+        <dt>登録者</dt>
+        <dd>{participants.length}名 <span class="dim">（チェックイン {checkedIn}名）</span></dd>
+      </div>
+    </dl>
+    {
+      event.data.registrationUrl && event.data.status === 'upcoming' && (
+        <p>
+          <a class="button" href={event.data.registrationUrl}>
+            参加登録する
+          </a>
+        </p>
+      )
+    }
+  </header>
+
+  <section class="stack">
+    <h2>タイムテーブル</h2>
+    <table>
+      <thead>
+        <tr><th>時間</th><th>プログラム</th><th>担当</th></tr>
+      </thead>
+      <tbody>
+        {
+          event.data.programs.map((program) => (
+            <tr>
+              <td class="nowrap">
+                {program.startAt}–{program.endAt}
+              </td>
+              <td>
+                <strong>{program.name}</strong>
+                {program.description && <p class="dim">{program.description}</p>}
+              </td>
+              <td class="dim">{program.owner || '—'}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+
+  {
+    tables.length > 0 && (
+      <section class="stack">
+        <h2>卓（テーブル）</h2>
+        <div class="grid">
+          {tables.map((table) => (
+            <div class="card">
+              <span class="badge">{table.kind === 'free' ? 'フリー卓' : 'トーナメント卓'}</span>
+              <h3>{table.name}</h3>
+              <p class="muted">{table.description}</p>
+              <p class="dim">席数 {table.seats}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    tournament && tournament.rounds.length > 0 && (
+      <section class="stack">
+        <h2>{tournament.name}</h2>
+        <p class="dim">
+          進行状況: {tournament.status} ・ 全 {tournament.rounds.length} ラウンド ・{' '}
+          <a href={href(`/signage/timer?event=${event.id}`)}>タイマーを開く</a>
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <>
+                <th>#</th>
+                <th>ラウンド</th>
+                <th>持ち時間</th>
+                <th>お題</th>
+              </>
+            </tr>
+          </thead>
+          <tbody>
+            {tournament.rounds.map((round) => {
+              const challenge = round.challengeId
+                ? challengeById.get(round.challengeId)
+                : undefined;
+              return (
+                <tr>
+                  <td>{round.no}</td>
+                  <td>{round.name}</td>
+                  <td class="nowrap">{formatMinutes(round.durationSec)}</td>
+                  <td>
+                    {challenge ? (
+                      <a href={href(`/challenges/${challenge.id}`)}>{challenge.data.title}</a>
+                    ) : (
+                      <span class="dim">当日発表</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+    )
+  }
+
+  {
+    results.length > 0 && (
+      <section class="stack">
+        <h2>受賞</h2>
+        <ul class="awards">
+          {results.map((result) => {
+            const award = awardById.get(result.awardId);
+            const person = participantById.get(result.participantId);
+            return (
+              <li class="card">
+                <span class="awards__emoji">{award?.emoji ?? '🏅'}</span>
+                <div>
+                  <strong>{award?.name ?? result.awardId}</strong>
+                  <p class="muted">
+                    {person?.displayName ?? result.participantId}
+                    {person?.github && <span class="dim"> (@{person.github})</span>}
+                  </p>
+                  {result.note && <p class="dim">{result.note}</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    )
+  }
+
+  {
+    Content && (
+      <section class="stack report">
+        <h2>開催レポート</h2>
+        <Content />
+      </section>
+    )
+  }
+</BaseLayout>
+
+<style>
+  .event-head {
+    margin-bottom: var(--space-8);
+  }
+  .event-head h1 {
+    margin: 0;
+  }
+  .event-head__date {
+    color: var(--color-accent-strong);
+    font-weight: 700;
+    margin: 0;
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+    gap: var(--space-4);
+    margin: var(--space-5) 0 0;
+    padding: var(--space-4) 0 0;
+    border-top: 1px solid var(--color-border);
+  }
+  .facts dt {
+    color: var(--color-text-dim);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .facts dd {
+    margin: var(--space-1) 0 0;
+  }
+  section + section {
+    margin-top: var(--space-8);
+  }
+  .nowrap {
+    white-space: nowrap;
+  }
+  td p {
+    margin: var(--space-1) 0 0;
+  }
+  .awards {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  }
+  .awards li {
+    display: flex;
+    gap: var(--space-4);
+    align-items: flex-start;
+  }
+  .awards__emoji {
+    font-size: var(--text-2xl);
+  }
+  .awards p {
+    margin: 0;
+  }
+  .report :global(h2) {
+    font-size: var(--text-xl);
+  }
+</style>

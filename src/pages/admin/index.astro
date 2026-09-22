@@ -1,0 +1,546 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedEvents } from '../../lib/data';
+import { href } from '../../lib/url';
+
+/*
+ * 当日の運営コンソール（会場での参加者登録・チェックイン）。
+ *
+ * 静的サイトなのでサーバに書き込めない。よって
+ *   1. 追加・チェックインの結果はこの端末の localStorage に貯める
+ *   2. 終わったら participants.json を書き出して Pull Request にする
+ * という流れにしている。詳しくは docs/operations-runbook.md。
+ *
+ * この画面に本名・連絡先を入力してはいけない（docs/policy/privacy.md）。
+ */
+const events = await getPublishedEvents();
+const allParticipants = await getCollection('participants');
+const seeds = await Promise.all(
+  events.map(async (event) => {
+    const entry = allParticipants.find((p) => p.id === event.id);
+    return {
+      id: event.id,
+      title: event.data.title,
+      date: event.data.date,
+      status: event.data.status,
+      capacity: event.data.capacity,
+      participants: entry?.data.participants ?? [],
+    };
+  }),
+);
+const awards = await getCollection('awards');
+---
+
+<BaseLayout title="運営コンソール" description="当日の参加者登録とチェックイン（スタッフ用）">
+  <h1>運営コンソール</h1>
+  <p class="notice">
+    <strong>この端末のブラウザにだけ保存されます。</strong>
+    入力内容はサーバに送られません。イベント終了後に「participants.json を書き出す」から ファイルを生成し、Pull
+    Requestでリポジトリに反映してください。 本名・メールアドレス・電話番号は入力しないこと。
+  </p>
+
+  <div class="toolbar card">
+    <label class="field">
+      <span class="dim">対象イベント</span>
+      <select id="event-select"></select>
+    </label>
+    <p class="counts dim" id="counts">—</p>
+    <div class="toolbar__actions">
+      <button class="button" id="export" type="button">participants.json を書き出す</button>
+      <button class="button" data-variant="ghost" id="copy" type="button">JSONをコピー</button>
+      <button class="button" data-variant="ghost" id="clear" type="button"
+        >この端末の追加分を破棄</button
+      >
+    </div>
+  </div>
+
+  <section class="stack">
+    <h2>参加者を追加</h2>
+    <form class="card form" id="add-form" autocomplete="off">
+      <label class="field">
+        <span>表示名 <span class="dim">（ハンドル・ニックネーム）</span></span>
+        <input type="text" name="displayName" maxlength="40" required />
+      </label>
+      <label class="field">
+        <span>GitHub <span class="dim">（任意・@なし）</span></span>
+        <input type="text" name="github" maxlength="40" pattern="[A-Za-z0-9-]*" />
+      </label>
+      <label class="field">
+        <span>区分</span>
+        <select name="role">
+          <option value="guest">guest（参加者）</option>
+          <option value="speaker">speaker（登壇）</option>
+          <option value="mentor">mentor（AIメンター）</option>
+          <option value="staff">staff（運営）</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>登録経路</span>
+        <select name="joinedVia">
+          <option value="walk-in">walk-in（当日来場）</option>
+          <option value="online">online（事前登録）</option>
+          <option value="invited">invited（招待）</option>
+        </select>
+      </label>
+      <label class="field field--wide">
+        <span>興味 <span class="dim">（カンマ区切り・任意）</span></span>
+        <input type="text" name="interests" maxlength="120" placeholder="LLM, Web, セキュリティ" />
+      </label>
+      <label class="field field--check">
+        <input type="checkbox" name="wantsLT" />
+        <span>LTを希望する</span>
+      </label>
+      <div class="form__actions">
+        <button class="button" type="submit">追加してチェックイン</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="stack">
+    <h2>参加者一覧</h2>
+    <p class="dim">
+      リポジトリに入っている分（committed）と、この端末で追加した分（local）をまとめて表示しています。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>表示名</th>
+          <th>区分</th>
+          <th>経路</th>
+          <th>状態</th>
+          <th>由来</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="participant-rows"></tbody>
+    </table>
+    <p class="dim" id="empty-message" hidden>まだ誰も登録されていません。</p>
+  </section>
+
+  <section class="stack">
+    <h2>受賞を記録する</h2>
+    <p class="dim">
+      選んだ内容から <code>results.json</code> の1行分を生成します。コピーして
+      <code>data/events/&lt;日付&gt;/results.json</code> に貼り付けてください。
+    </p>
+    <div class="card form">
+      <label class="field">
+        <span>賞</span>
+        <select id="award-select">
+          {
+            awards.map((award) => (
+              <option value={award.id}>
+                {award.data.emoji} {award.data.name}
+              </option>
+            ))
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>受賞者</span>
+        <select id="award-participant"></select>
+      </label>
+      <label class="field field--wide">
+        <span>メモ <span class="dim">（任意）</span></span>
+        <input type="text" id="award-note" maxlength="200" />
+      </label>
+      <div class="form__actions">
+        <button class="button" data-variant="ghost" id="award-copy" type="button"
+          >JSONをコピー</button
+        >
+      </div>
+    </div>
+    <pre id="award-output" class="award-output">—</pre>
+  </section>
+
+  <p class="dim">
+    サイネージ: <a href={href('/signage')}>会場スクリーン</a> ・
+    <a href={href('/signage/timer')}>トーナメントタイマー</a>
+  </p>
+
+  <script type="application/json" id="admin-seed" set:html={JSON.stringify(seeds)} />
+
+  <script>
+    type Participant = {
+      id: string;
+      displayName: string;
+      github: string;
+      role: 'guest' | 'staff' | 'mentor' | 'speaker';
+      joinedVia: 'online' | 'walk-in' | 'invited';
+      status: 'registered' | 'checked-in' | 'cancelled' | 'no-show';
+      interests: string[];
+      wantsLT: boolean;
+      note?: string;
+    };
+    type Seed = {
+      id: string;
+      title: string;
+      date: string;
+      status: string;
+      capacity: number;
+      participants: Participant[];
+    };
+    /** この端末で加えた変更だけを保存する。committed 分は上書きしない。 */
+    type LocalState = {
+      added: Participant[];
+      statusOverrides: Record<string, Participant['status']>;
+    };
+
+    const STORAGE_PREFIX = 'hbp:admin:';
+    const seeds: Seed[] = JSON.parse(
+      document.querySelector<HTMLScriptElement>('#admin-seed')?.textContent ?? '[]',
+    );
+
+    const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel);
+
+    let currentEventId =
+      new URLSearchParams(location.search).get('event') ??
+      seeds.find((s) => s.status === 'upcoming' || s.status === 'ongoing')?.id ??
+      seeds[0]?.id ??
+      '';
+
+    function storageKey(eventId: string) {
+      return `${STORAGE_PREFIX}${eventId}`;
+    }
+
+    function loadLocal(eventId: string): LocalState {
+      try {
+        const stored = localStorage.getItem(storageKey(eventId));
+        if (stored) return JSON.parse(stored) as LocalState;
+      } catch {
+        /* 読めなければ空から始める */
+      }
+      return { added: [], statusOverrides: {} };
+    }
+
+    function saveLocal(eventId: string, local: LocalState) {
+      try {
+        localStorage.setItem(storageKey(eventId), JSON.stringify(local));
+      } catch {
+        window.alert('この端末に保存できませんでした（プライベートモードの可能性）。');
+      }
+    }
+
+    function seedOf(eventId: string): Seed | undefined {
+      return seeds.find((s) => s.id === eventId);
+    }
+
+    /** committed + local をマージした、書き出し用の最終リスト。 */
+    function merged(
+      eventId: string,
+    ): { participant: Participant; origin: 'committed' | 'local' }[] {
+      const seed = seedOf(eventId);
+      const local = loadLocal(eventId);
+      const apply = (p: Participant): Participant => ({
+        ...p,
+        status: local.statusOverrides[p.id] ?? p.status,
+      });
+      return [
+        ...(seed?.participants ?? []).map((p) => ({
+          participant: apply(p),
+          origin: 'committed' as const,
+        })),
+        ...local.added.map((p) => ({ participant: apply(p), origin: 'local' as const })),
+      ];
+    }
+
+    function nextParticipantId(eventId: string): string {
+      const used = merged(eventId).map((r) => r.participant.id);
+      let n = used.length + 1;
+      let candidate = `p-${eventId}-${String(n).padStart(3, '0')}`;
+      while (used.includes(candidate)) {
+        n++;
+        candidate = `p-${eventId}-${String(n).padStart(3, '0')}`;
+      }
+      return candidate;
+    }
+
+    function exportJson(eventId: string): string {
+      return `${JSON.stringify(
+        { eventId, participants: merged(eventId).map((r) => r.participant) },
+        null,
+        2,
+      )}\n`;
+    }
+
+    /* ---- 描画 ---------------------------------------------------------- */
+
+    function renderEventSelect() {
+      const select = $<HTMLSelectElement>('#event-select');
+      if (!select) return;
+      select.innerHTML = '';
+      for (const seed of seeds) {
+        const option = document.createElement('option');
+        option.value = seed.id;
+        option.textContent = `${seed.date} ${seed.title}`;
+        option.selected = seed.id === currentEventId;
+        select.append(option);
+      }
+    }
+
+    function renderTable() {
+      const tbody = $('#participant-rows');
+      const empty = $('#empty-message');
+      if (!tbody || !empty) return;
+
+      const rows = merged(currentEventId);
+      tbody.innerHTML = '';
+      empty.hidden = rows.length > 0;
+
+      for (const { participant, origin } of rows) {
+        const tr = document.createElement('tr');
+
+        const name = document.createElement('td');
+        name.innerHTML = '<strong></strong><div class="dim"></div>';
+        name.querySelector('strong')!.textContent = participant.displayName;
+        name.querySelector('.dim')!.textContent = [
+          participant.github ? `@${participant.github}` : '',
+          participant.interests.join(' / '),
+          participant.wantsLT ? 'LT希望' : '',
+        ]
+          .filter(Boolean)
+          .join(' ・ ');
+        tr.append(name);
+
+        for (const value of [participant.role, participant.joinedVia]) {
+          const td = document.createElement('td');
+          td.textContent = value;
+          tr.append(td);
+        }
+
+        const statusCell = document.createElement('td');
+        const statusSelect = document.createElement('select');
+        for (const value of ['registered', 'checked-in', 'cancelled', 'no-show'] as const) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          option.selected = value === participant.status;
+          statusSelect.append(option);
+        }
+        statusSelect.addEventListener('change', () => {
+          const local = loadLocal(currentEventId);
+          local.statusOverrides[participant.id] = statusSelect.value as Participant['status'];
+          saveLocal(currentEventId, local);
+          renderCounts();
+        });
+        statusCell.append(statusSelect);
+        tr.append(statusCell);
+
+        const originCell = document.createElement('td');
+        originCell.innerHTML = '<span class="badge"></span>';
+        originCell.querySelector('.badge')!.textContent = origin;
+        tr.append(originCell);
+
+        const actionCell = document.createElement('td');
+        if (origin === 'local') {
+          const remove = document.createElement('button');
+          remove.className = 'button';
+          remove.dataset.variant = 'ghost';
+          remove.type = 'button';
+          remove.textContent = '削除';
+          remove.addEventListener('click', () => {
+            const local = loadLocal(currentEventId);
+            local.added = local.added.filter((p) => p.id !== participant.id);
+            delete local.statusOverrides[participant.id];
+            saveLocal(currentEventId, local);
+            renderAll();
+          });
+          actionCell.append(remove);
+        }
+        tr.append(actionCell);
+
+        tbody.append(tr);
+      }
+    }
+
+    function renderCounts() {
+      const counts = $('#counts');
+      if (!counts) return;
+      const rows = merged(currentEventId);
+      const checkedIn = rows.filter((r) => r.participant.status === 'checked-in').length;
+      const capacity = seedOf(currentEventId)?.capacity ?? 0;
+      counts.textContent = `登録 ${rows.length}名 / チェックイン ${checkedIn}名 / 定員 ${capacity}名`;
+    }
+
+    function renderAwardParticipants() {
+      const select = $<HTMLSelectElement>('#award-participant');
+      if (!select) return;
+      select.innerHTML = '';
+      for (const { participant } of merged(currentEventId)) {
+        const option = document.createElement('option');
+        option.value = participant.id;
+        option.textContent = `${participant.displayName} (${participant.id})`;
+        select.append(option);
+      }
+      renderAwardOutput();
+    }
+
+    function renderAwardOutput() {
+      const output = $('#award-output');
+      if (!output) return;
+      const awardId = $<HTMLSelectElement>('#award-select')?.value ?? '';
+      const participantId = $<HTMLSelectElement>('#award-participant')?.value ?? '';
+      const note = $<HTMLInputElement>('#award-note')?.value ?? '';
+      if (!awardId || !participantId) {
+        output.textContent = '—';
+        return;
+      }
+      output.textContent = JSON.stringify({ awardId, participantId, rank: 1, note }, null, 2);
+    }
+
+    function renderAll() {
+      renderEventSelect();
+      renderTable();
+      renderCounts();
+      renderAwardParticipants();
+    }
+
+    /* ---- イベントハンドラ ------------------------------------------------ */
+
+    $('#event-select')?.addEventListener('change', (e) => {
+      currentEventId = (e.target as HTMLSelectElement).value;
+      renderAll();
+    });
+
+    $<HTMLFormElement>('#add-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target as HTMLFormElement;
+      const formData = new FormData(form);
+      const displayName = String(formData.get('displayName') ?? '').trim();
+      if (!displayName) return;
+
+      const participant: Participant = {
+        id: nextParticipantId(currentEventId),
+        displayName,
+        github: String(formData.get('github') ?? '').trim(),
+        role: (formData.get('role') as Participant['role']) ?? 'guest',
+        joinedVia: (formData.get('joinedVia') as Participant['joinedVia']) ?? 'walk-in',
+        status: 'checked-in',
+        interests: String(formData.get('interests') ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        wantsLT: formData.get('wantsLT') === 'on',
+      };
+
+      const local = loadLocal(currentEventId);
+      local.added.push(participant);
+      saveLocal(currentEventId, local);
+      form.reset();
+      form.querySelector<HTMLInputElement>('[name="displayName"]')?.focus();
+      renderAll();
+    });
+
+    $('#export')?.addEventListener('click', () => {
+      const blob = new Blob([exportJson(currentEventId)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `participants-${currentEventId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    $('#copy')?.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(exportJson(currentEventId));
+      window.alert('participants.json の中身をコピーしました。');
+    });
+
+    $('#clear')?.addEventListener('click', () => {
+      if (!window.confirm('この端末で追加した分とチェックイン状態を破棄します。よろしいですか？'))
+        return;
+      localStorage.removeItem(storageKey(currentEventId));
+      renderAll();
+    });
+
+    $('#award-select')?.addEventListener('change', renderAwardOutput);
+    $('#award-participant')?.addEventListener('change', renderAwardOutput);
+    $('#award-note')?.addEventListener('input', renderAwardOutput);
+    $('#award-copy')?.addEventListener('click', async () => {
+      await navigator.clipboard.writeText($('#award-output')?.textContent ?? '');
+      window.alert('results.json の1行分をコピーしました。');
+    });
+
+    renderAll();
+  </script>
+
+  <style>
+    .notice {
+      border-left: 3px solid var(--color-warn);
+      background: var(--color-surface);
+      padding: var(--space-3) var(--space-4);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--color-text-muted);
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .toolbar__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+    .counts {
+      margin: 0 0 var(--space-2);
+    }
+    section + section {
+      margin-top: var(--space-8);
+    }
+    .form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+      gap: var(--space-4);
+      align-items: end;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .field--wide {
+      grid-column: 1 / -1;
+    }
+    .field--check {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .form__actions {
+      grid-column: 1 / -1;
+    }
+    input[type='text'],
+    select {
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-2) var(--space-3);
+      font-family: inherit;
+      font-size: var(--text-base);
+      width: 100%;
+    }
+    /* 参加者一覧の行は JS で生成するため :global() が必要（signage と同じ理由） */
+    #participant-rows :global(select) {
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: var(--text-sm);
+      padding: var(--space-1) var(--space-2);
+    }
+    #participant-rows :global(.button) {
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--text-sm);
+    }
+    .award-output {
+      margin-top: var(--space-4);
+    }
+  </style>
+</BaseLayout>

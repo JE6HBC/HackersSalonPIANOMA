@@ -1,0 +1,558 @@
+---
+import { getCollection } from 'astro:content';
+import SignageLayout from '../../layouts/SignageLayout.astro';
+import { getChallengeIndex } from '../../lib/data';
+
+/*
+ * トーナメント進行タイマー（会場スクリーン兼オペレータ操作盤）。
+ *
+ * 設計メモ:
+ *  - 静的サイトなのでサーバ側に状態は持てない。進行状態はブラウザの localStorage に置き、
+ *    同一ブラウザの別ウィンドウとは BroadcastChannel で同期する。
+ *    → 「操作用ウィンドウ」と「プロジェクタに出す全画面ウィンドウ」を同じPCで開く運用が前提。
+ *    別のPC・別のスマホとは同期しない（docs/architecture.md の「できないこと」参照）。
+ *  - 残り時間は経過秒の足し算ではなく終了時刻(epoch ms)との差で計算する。
+ *    タブが非アクティブで setInterval が間引かれてもズレない。
+ *  - ?display=1 を付けると操作UIが消え、表示専用になる。
+ */
+const tournaments = await getCollection('tournaments');
+const allEvents = await getCollection('events');
+const challengeIndex = await getChallengeIndex();
+
+const timerData = await Promise.all(
+  tournaments.map(async (t) => {
+    const event = allEvents.find((e) => e.id === t.data.eventId);
+    const challenges = t.data.rounds.map((r) =>
+      r.challengeId ? (challengeIndex.get(r.challengeId) ?? null) : null,
+    );
+    return {
+      eventId: t.data.eventId,
+      eventTitle: event?.data.title ?? t.data.eventId,
+      name: t.data.name,
+      rounds: t.data.rounds.map((round, i) => ({
+        no: round.no,
+        name: round.name,
+        durationSec: round.durationSec,
+        breakAfterSec: round.breakAfterSec,
+        challengeTitle: challenges[i]?.data.title ?? '',
+        challengeId: round.challengeId,
+      })),
+    };
+  }),
+);
+---
+
+<SignageLayout title="トーナメントタイマー">
+  <div class="timer-screen" id="screen">
+    <header class="timer-head">
+      <div>
+        <p class="timer-kicker" id="tournament-name">—</p>
+        <p class="timer-event dim" id="event-title">—</p>
+      </div>
+      <div class="timer-round">
+        <span class="timer-round__no" id="round-no">—</span>
+        <span class="timer-round__total dim" id="round-total"></span>
+      </div>
+    </header>
+
+    <main class="timer-main">
+      <p class="timer-phase" id="phase-label">READY</p>
+      <p class="timer-clock" id="clock">--:--</p>
+      <div class="timer-bar"><div class="timer-bar__fill" id="bar"></div></div>
+      <p class="timer-round-name" id="round-name">ラウンドを選んでください</p>
+      <p class="timer-challenge" id="challenge-title"></p>
+    </main>
+
+    <footer class="timer-controls" id="controls">
+      <div class="timer-controls__row">
+        <label class="field">
+          <span class="dim">トーナメント</span>
+          <select id="tournament-select"></select>
+        </label>
+        <label class="field">
+          <span class="dim">ラウンド</span>
+          <select id="round-select"></select>
+        </label>
+      </div>
+      <div class="timer-controls__row">
+        <button class="button" id="toggle" type="button">開始</button>
+        <button class="button" data-variant="ghost" id="reset" type="button">リセット</button>
+        <button class="button" data-variant="ghost" id="prev" type="button">前へ</button>
+        <button class="button" data-variant="ghost" id="next" type="button">次へ</button>
+        <button class="button" data-variant="ghost" id="plus" type="button">+1分</button>
+        <button class="button" data-variant="ghost" id="minus" type="button">-1分</button>
+        <button class="button" data-variant="ghost" id="open-display" type="button">
+          表示用ウィンドウ
+        </button>
+      </div>
+      <p class="dim timer-help">
+        <kbd>Space</kbd> 開始/一時停止 ・ <kbd>N</kbd> 次のラウンド ・ <kbd>R</kbd> リセット ・
+        <kbd>F</kbd> 全画面
+      </p>
+    </footer>
+  </div>
+
+  <script type="application/json" id="timer-data" set:html={JSON.stringify(timerData)} />
+
+  <script>
+    type Round = {
+      no: number;
+      name: string;
+      durationSec: number;
+      breakAfterSec: number;
+      challengeTitle: string;
+      challengeId: string;
+    };
+    type Tournament = {
+      eventId: string;
+      eventTitle: string;
+      name: string;
+      rounds: Round[];
+    };
+    type Phase = 'round' | 'break';
+    type TimerState = {
+      eventId: string;
+      roundIndex: number;
+      phase: Phase;
+      running: boolean;
+      /** running のときだけ使う。終了時刻(epoch ms) */
+      endsAt: number | null;
+      /** 停止中の残り(ms) */
+      remainingMs: number;
+    };
+
+    const STORAGE_KEY = 'hbp:tournament-timer';
+    const CHANNEL = 'hbp:tournament-timer';
+
+    const raw = document.querySelector<HTMLScriptElement>('#timer-data')?.textContent ?? '[]';
+    const tournaments: Tournament[] = JSON.parse(raw);
+    const params = new URLSearchParams(location.search);
+    const displayOnly = params.get('display') === '1';
+
+    const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel);
+    const controls = $('#controls');
+    if (displayOnly && controls) controls.hidden = true;
+
+    const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
+
+    function initialState(): TimerState {
+      const requested = params.get('event');
+      const fallback = tournaments.find((t) => t.eventId === requested) ?? tournaments[0];
+      return {
+        eventId: fallback?.eventId ?? '',
+        roundIndex: 0,
+        phase: 'round',
+        running: false,
+        endsAt: null,
+        remainingMs: (fallback?.rounds[0]?.durationSec ?? 300) * 1000,
+      };
+    }
+
+    function loadState(): TimerState {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return initialState();
+        const parsed = JSON.parse(stored) as TimerState;
+        if (!tournaments.some((t) => t.eventId === parsed.eventId)) return initialState();
+        return parsed;
+      } catch {
+        return initialState();
+      }
+    }
+
+    let state = loadState();
+
+    function currentTournament(): Tournament | undefined {
+      return tournaments.find((t) => t.eventId === state.eventId);
+    }
+
+    function currentRound(): Round | undefined {
+      return currentTournament()?.rounds[state.roundIndex];
+    }
+
+    function phaseDurationMs(): number {
+      const round = currentRound();
+      if (!round) return 0;
+      return (state.phase === 'round' ? round.durationSec : round.breakAfterSec) * 1000;
+    }
+
+    function remainingMs(): number {
+      if (state.running && state.endsAt !== null) return Math.max(0, state.endsAt - Date.now());
+      return Math.max(0, state.remainingMs);
+    }
+
+    function save(broadcast = true) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch {
+        /* プライベートモードなどで失敗しても進行は続ける */
+      }
+      if (broadcast) channel?.postMessage(state);
+      render();
+    }
+
+    channel?.addEventListener('message', (event) => {
+      state = event.data as TimerState;
+      render();
+    });
+
+    /* ---- 操作 ---------------------------------------------------------- */
+
+    function setRound(index: number, phase: Phase = 'round') {
+      const tournament = currentTournament();
+      if (!tournament) return;
+      state.roundIndex = Math.max(0, Math.min(index, tournament.rounds.length - 1));
+      state.phase = phase;
+      state.running = false;
+      state.endsAt = null;
+      state.remainingMs = phaseDurationMs();
+      save();
+    }
+
+    function toggle() {
+      if (state.running) {
+        state.remainingMs = remainingMs();
+        state.running = false;
+        state.endsAt = null;
+      } else {
+        if (state.remainingMs <= 0) state.remainingMs = phaseDurationMs();
+        state.running = true;
+        state.endsAt = Date.now() + state.remainingMs;
+        void ensureAudio();
+      }
+      save();
+    }
+
+    function advance() {
+      const tournament = currentTournament();
+      if (!tournament) return;
+      const round = currentRound();
+      // ラウンド終了後に休憩が設定されていれば休憩へ、なければ次のラウンドへ
+      if (state.phase === 'round' && round && round.breakAfterSec > 0) {
+        setRound(state.roundIndex, 'break');
+      } else if (state.roundIndex < tournament.rounds.length - 1) {
+        setRound(state.roundIndex + 1, 'round');
+      } else {
+        setRound(state.roundIndex, 'round');
+      }
+    }
+
+    function retreat() {
+      if (state.phase === 'break') setRound(state.roundIndex, 'round');
+      else setRound(state.roundIndex - 1, 'round');
+    }
+
+    function adjust(deltaMs: number) {
+      if (state.running && state.endsAt !== null) {
+        state.endsAt = Math.max(Date.now(), state.endsAt + deltaMs);
+      } else {
+        state.remainingMs = Math.max(0, state.remainingMs + deltaMs);
+      }
+      save();
+    }
+
+    /* ---- 終了音（ユーザー操作後にだけ鳴らす） ---------------------------- */
+
+    let audio: AudioContext | null = null;
+    async function ensureAudio() {
+      if (audio) return;
+      const Ctor = window.AudioContext ?? (window as any).webkitAudioContext;
+      if (!Ctor) return;
+      audio = new Ctor();
+      if (audio.state === 'suspended') await audio.resume();
+    }
+
+    function beep(times = 3) {
+      if (!audio) return;
+      for (let i = 0; i < times; i++) {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.frequency.value = 880;
+        gain.gain.value = 0.0001;
+        osc.connect(gain).connect(audio.destination);
+        const start = audio.currentTime + i * 0.35;
+        gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+        osc.start(start);
+        osc.stop(start + 0.3);
+      }
+    }
+
+    /* ---- 描画 ---------------------------------------------------------- */
+
+    let lastFiredKey = '';
+
+    function render() {
+      const tournament = currentTournament();
+      const round = currentRound();
+      const ms = remainingMs();
+      const total = phaseDurationMs();
+
+      $('#tournament-name')!.textContent = tournament?.name ?? 'トーナメント未設定';
+      $('#event-title')!.textContent = tournament?.eventTitle ?? '';
+      $('#round-no')!.textContent = round ? `R${round.no}` : '—';
+      $('#round-total')!.textContent = tournament ? `/ ${tournament.rounds.length}` : '';
+      $('#round-name')!.textContent = round?.name ?? 'ラウンドがありません';
+      $('#challenge-title')!.textContent = round?.challengeTitle
+        ? `お題: ${round.challengeTitle}`
+        : '';
+
+      const seconds = Math.ceil(ms / 1000);
+      const mm = Math.floor(seconds / 60);
+      const ss = seconds % 60;
+      $('#clock')!.textContent = `${mm}:${String(ss).padStart(2, '0')}`;
+
+      const phaseLabel = state.phase === 'break' ? 'BREAK' : state.running ? 'LIVE' : 'READY';
+      $('#phase-label')!.textContent = phaseLabel;
+
+      const screen = $('#screen')!;
+      screen.dataset.phase = state.phase;
+      screen.dataset.running = String(state.running);
+      screen.dataset.warn = String(ms > 0 && ms <= 30_000);
+      screen.dataset.done = String(ms <= 0);
+
+      const bar = $('#bar')!;
+      bar.style.width = total > 0 ? `${Math.max(0, Math.min(100, (ms / total) * 100))}%` : '0%';
+
+      const toggleBtn = $<HTMLButtonElement>('#toggle');
+      if (toggleBtn) toggleBtn.textContent = state.running ? '一時停止' : '開始';
+
+      // 0 になった瞬間に一度だけ鳴らす
+      const key = `${state.eventId}:${state.roundIndex}:${state.phase}`;
+      if (ms <= 0 && state.running && lastFiredKey !== key) {
+        lastFiredKey = key;
+        beep();
+        state.running = false;
+        state.endsAt = null;
+        state.remainingMs = 0;
+        save();
+      }
+      if (ms > 0) lastFiredKey = lastFiredKey === key ? '' : lastFiredKey;
+    }
+
+    /* ---- セレクトボックス ------------------------------------------------ */
+
+    function renderSelects() {
+      const tournamentSelect = $<HTMLSelectElement>('#tournament-select');
+      const roundSelect = $<HTMLSelectElement>('#round-select');
+      if (!tournamentSelect || !roundSelect) return;
+
+      tournamentSelect.innerHTML = '';
+      for (const t of tournaments) {
+        const option = document.createElement('option');
+        option.value = t.eventId;
+        option.textContent = `${t.eventId} ${t.name}`;
+        option.selected = t.eventId === state.eventId;
+        tournamentSelect.append(option);
+      }
+
+      roundSelect.innerHTML = '';
+      for (const [i, round] of (currentTournament()?.rounds ?? []).entries()) {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = `R${round.no} ${round.name}`;
+        option.selected = i === state.roundIndex;
+        roundSelect.append(option);
+      }
+    }
+
+    $('#tournament-select')?.addEventListener('change', (e) => {
+      state.eventId = (e.target as HTMLSelectElement).value;
+      setRound(0, 'round');
+      renderSelects();
+    });
+    $('#round-select')?.addEventListener('change', (e) => {
+      setRound(Number((e.target as HTMLSelectElement).value), 'round');
+    });
+    $('#toggle')?.addEventListener('click', toggle);
+    $('#reset')?.addEventListener('click', () => setRound(state.roundIndex, state.phase));
+    $('#next')?.addEventListener('click', () => {
+      advance();
+      renderSelects();
+    });
+    $('#prev')?.addEventListener('click', () => {
+      retreat();
+      renderSelects();
+    });
+    $('#plus')?.addEventListener('click', () => adjust(60_000));
+    $('#minus')?.addEventListener('click', () => adjust(-60_000));
+    $('#open-display')?.addEventListener('click', () => {
+      const url = new URL(location.href);
+      url.searchParams.set('display', '1');
+      window.open(url.toString(), 'hbp-timer-display', 'width=1280,height=720');
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (displayOnly) return;
+      if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        toggle();
+      } else if (e.key.toLowerCase() === 'n') {
+        advance();
+        renderSelects();
+      } else if (e.key.toLowerCase() === 'r') {
+        setRound(state.roundIndex, state.phase);
+      } else if (e.key.toLowerCase() === 'f') {
+        void document.documentElement.requestFullscreen?.();
+      }
+    });
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        state = JSON.parse(e.newValue) as TimerState;
+        render();
+      }
+    });
+
+    renderSelects();
+    render();
+    setInterval(render, 200);
+  </script>
+
+  <style>
+    .timer-screen {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: clamp(1rem, 3vh, 2.5rem) clamp(1.5rem, 3vw, 3rem);
+      gap: clamp(0.5rem, 2vh, 1.5rem);
+      transition: background-color 0.4s ease;
+    }
+    .timer-screen[data-warn='true'] {
+      background: radial-gradient(circle at 50% 40%, #3a1d16 0%, var(--color-bg) 70%);
+    }
+    .timer-screen[data-done='true'] {
+      background: radial-gradient(circle at 50% 40%, #4a1a16 0%, var(--color-bg) 70%);
+    }
+
+    .timer-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: 0.6em;
+    }
+    .timer-kicker {
+      margin: 0;
+      font-size: clamp(1rem, 2vw, 1.8rem);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .timer-event {
+      margin: 0.2em 0 0;
+    }
+    .timer-round {
+      display: flex;
+      align-items: baseline;
+      gap: 0.3em;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-round__no {
+      font-size: clamp(1.6rem, 3.2vw, 3rem);
+      font-weight: 700;
+      color: var(--color-accent);
+    }
+
+    .timer-main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 0;
+    }
+    .timer-phase {
+      margin: 0;
+      letter-spacing: 0.4em;
+      font-size: clamp(0.8rem, 1.4vw, 1.4rem);
+      color: var(--color-text-dim);
+    }
+    .timer-screen[data-running='true'] .timer-phase {
+      color: var(--color-live);
+    }
+    .timer-screen[data-phase='break'] .timer-phase {
+      color: var(--color-ok);
+    }
+    .timer-clock {
+      margin: 0.05em 0;
+      font-size: clamp(5rem, 22vw, 20rem);
+      font-weight: 200;
+      line-height: 0.95;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .timer-screen[data-warn='true'] .timer-clock,
+    .timer-screen[data-done='true'] .timer-clock {
+      color: var(--color-live);
+    }
+    .timer-bar {
+      width: min(100%, 60rem);
+      height: 6px;
+      border-radius: 999px;
+      background: var(--color-surface-raised);
+      overflow: hidden;
+      margin: 0.4em 0 1em;
+    }
+    .timer-bar__fill {
+      height: 100%;
+      background: var(--color-accent);
+      transition:
+        width 0.2s linear,
+        background-color 0.3s ease;
+    }
+    .timer-screen[data-warn='true'] .timer-bar__fill {
+      background: var(--color-live);
+    }
+    .timer-round-name {
+      margin: 0;
+      font-size: clamp(1.2rem, 2.6vw, 2.6rem);
+      font-weight: 700;
+    }
+    .timer-challenge {
+      margin: 0.3em 0 0;
+      color: var(--color-accent-strong);
+      font-size: clamp(0.9rem, 1.6vw, 1.5rem);
+    }
+
+    .timer-controls {
+      border-top: 1px solid var(--color-border);
+      padding-top: var(--space-3);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      font-size: 1rem;
+    }
+    .timer-controls__row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      align-items: flex-end;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .field select {
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-2) var(--space-3);
+      font-family: inherit;
+      font-size: 1rem;
+      min-width: 14rem;
+    }
+    .timer-help {
+      margin: 0;
+    }
+    kbd {
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 0.1em 0.4em;
+    }
+  </style>
+</SignageLayout>

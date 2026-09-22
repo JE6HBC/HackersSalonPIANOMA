@@ -1,0 +1,134 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { CATEGORY_LABELS, LEVEL_LABELS, formatDate, formatMinutes } from '../../lib/format';
+import { href } from '../../lib/url';
+
+export async function getStaticPaths() {
+  const challenges = await getCollection('challenges', ({ data }) => !data.draft);
+  return challenges.map((challenge) => ({
+    params: { id: challenge.id },
+    props: { challenge },
+  }));
+}
+
+const { challenge } = Astro.props;
+const { data } = challenge;
+const { Content } = await render(challenge);
+---
+
+<BaseLayout title={data.title} description={`${LEVEL_LABELS[data.level]} / ${data.id}`}>
+  <p><a href={href('/challenges')}>← AI課題DBへ</a></p>
+
+  <header class="stack challenge-head">
+    <div class="challenge-head__meta">
+      <span class="badge">{LEVEL_LABELS[data.level]}</span>
+      <span class="badge">{CATEGORY_LABELS[data.category]}</span>
+      <span class="badge">制限 {formatMinutes(data.timeLimitSec)}</span>
+    </div>
+    <h1>{data.title}</h1>
+    <p class="dim">
+      {data.id} ・ 作成 {formatDate(data.createdAt)}
+      {data.author && ` ・ 作問 ${data.author}`}
+      {' ・ ライセンス '}{data.license}
+    </p>
+    {
+      data.usedIn.length > 0 && (
+        <p class="dim">
+          出題回:{' '}
+          {data.usedIn.map((eventId, i) => (
+            <>
+              {i > 0 && ' / '}
+              <a href={href(`/events/${eventId}`)}>{eventId}</a>
+            </>
+          ))}
+        </p>
+      )
+    }
+  </header>
+
+  <p class="notice">
+    模範回答はページ下部で折りたたまれています。先に自力（＋AI）で解いてから開くのがおすすめ。
+  </p>
+
+  <article class="prose" id="challenge-body">
+    <Content />
+  </article>
+</BaseLayout>
+
+<script>
+  /*
+   * 「## 模範回答」以降を <details> に畳む。
+   * JSが無効でも本文は全部読めるので、隠蔽ではなくネタバレ防止の補助として扱う。
+   * 本当に伏せたいお題は front matter の draft: true を使い、イベント後にPRで公開すること。
+   */
+  const body = document.querySelector<HTMLElement>('#challenge-body');
+  const headings = body ? [...body.querySelectorAll<HTMLHeadingElement>('h2')] : [];
+  const answerHeading = headings.find((h) => h.textContent?.trim().startsWith('模範回答'));
+
+  if (body && answerHeading) {
+    const details = document.createElement('details');
+    details.className = 'answer';
+    const summary = document.createElement('summary');
+    summary.textContent = '模範回答と解説を表示する';
+    details.append(summary);
+
+    let node: ChildNode | null = answerHeading;
+    const moved: ChildNode[] = [];
+    while (node) {
+      moved.push(node);
+      node = node.nextSibling;
+    }
+    answerHeading.before(details);
+    details.append(...moved);
+  }
+</script>
+
+<style>
+  .challenge-head {
+    margin-bottom: var(--space-6);
+  }
+  .challenge-head h1 {
+    margin: 0;
+  }
+  .challenge-head__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .challenge-head p {
+    margin: 0;
+  }
+  .notice {
+    border-left: 3px solid var(--color-accent-dim);
+    background: var(--color-surface);
+    padding: var(--space-3) var(--space-4);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--color-text-muted);
+  }
+  .prose :global(h2) {
+    margin-top: var(--space-6);
+    font-size: var(--text-xl);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-2);
+  }
+  .prose :global(details.answer) {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    margin-top: var(--space-6);
+  }
+  .prose :global(details.answer > summary) {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--color-accent-strong);
+    list-style-position: outside;
+  }
+  .prose :global(details.answer[open] > summary) {
+    margin-bottom: var(--space-4);
+  }
+  .prose :global(details.answer > h2:first-of-type) {
+    margin-top: 0;
+  }
+</style>

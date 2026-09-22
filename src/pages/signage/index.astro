@@ -1,0 +1,439 @@
+---
+import { getCollection } from 'astro:content';
+import SignageLayout from '../../layouts/SignageLayout.astro';
+import { getPublishedEvents } from '../../lib/data';
+import { href } from '../../lib/url';
+
+/*
+ * 会場の大型スクリーンに映す画面。
+ * 静的サイトなので「今どのプログラムか」はサーバではなくブラウザ側の時計で判定する。
+ * 表示するイベントは ?event=YYYY-MM-DD で指定でき、省略時は当日 → 直近の開催予定の順に選ぶ。
+ */
+const events = await getPublishedEvents();
+const allParticipants = await getCollection('participants');
+const allTables = await getCollection('tables');
+
+const signageData = await Promise.all(
+  events
+    .filter((e) => e.data.status !== 'cancelled')
+    .map(async (event) => {
+      const participantEntry = allParticipants.find((p) => p.id === event.id);
+      const tableEntry = allTables.find((t) => t.id === event.id);
+      const participants = participantEntry?.data.participants ?? [];
+      return {
+        id: event.id,
+        title: event.data.title,
+        date: event.data.date,
+        status: event.data.status,
+        venue: event.data.venue.name,
+        capacity: event.data.capacity,
+        registrationUrl: event.data.registrationUrl ?? '',
+        registered: participants.length,
+        checkedIn: participants.filter((p) => p.status === 'checked-in').length,
+        programs: event.data.programs,
+        tables: (tableEntry?.data.tables ?? []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          kind: t.kind,
+          seats: t.seats,
+          description: t.description,
+        })),
+      };
+    }),
+);
+
+const timerUrl = href('/signage/timer');
+const awards = await getCollection('awards');
+---
+
+<SignageLayout title="会場サイネージ">
+  <div class="signage-screen" id="screen" data-timer-url={timerUrl}>
+    <header class="signage-top">
+      <div>
+        <p class="signage-kicker">Hacker's Bar @ Onarimon PIANOMA</p>
+        <h1 id="event-title">—</h1>
+        <p class="signage-sub" id="event-date">—</p>
+      </div>
+      <div class="signage-clock">
+        <span id="clock">--:--</span>
+        <span class="signage-clock__sec" id="clock-sec">:--</span>
+      </div>
+    </header>
+
+    <main class="signage-body">
+      <section class="panel panel--now">
+        <h2 class="panel__title">NOW</h2>
+        <p class="now__name" id="now-name">—</p>
+        <p class="now__time" id="now-time"></p>
+        <p class="now__desc" id="now-desc"></p>
+        <div class="now__next">
+          <span class="panel__label">NEXT</span>
+          <span id="next-name">—</span>
+          <span class="dim" id="next-time"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel__title">TABLES</h2>
+        <ul class="tables" id="tables"></ul>
+      </section>
+
+      <section class="panel panel--stats">
+        <h2 class="panel__title">TONIGHT</h2>
+        <div class="stats">
+          <div class="stat">
+            <span class="stat__value" id="stat-checkedin">0</span>
+            <span class="stat__label">CHECKED IN</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value" id="stat-registered">0</span>
+            <span class="stat__label">REGISTERED</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value" id="stat-capacity">0</span>
+            <span class="stat__label">CAPACITY</span>
+          </div>
+        </div>
+        <ul class="award-strip">
+          {
+            awards.slice(0, 5).map((award) => (
+              <li>
+                <span>{award.data.emoji}</span>
+                <span>{award.data.name}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+    </main>
+
+    <footer class="signage-bottom">
+      <p id="signage-cta">参加登録・アーカイブは GitHub リポジトリから</p>
+      <p class="dim">github.com/JE6HBC/HackersSalonPIANOMA</p>
+    </footer>
+  </div>
+
+  <script type="application/json" id="signage-data" set:html={JSON.stringify(signageData)} />
+
+  <script>
+    type Program = {
+      id: string;
+      name: string;
+      startAt: string;
+      endAt: string;
+      owner: string;
+      description: string;
+    };
+    type Table = {
+      id: string;
+      name: string;
+      kind: string;
+      seats: number;
+      description: string;
+    };
+    type SignageEvent = {
+      id: string;
+      title: string;
+      date: string;
+      status: string;
+      venue: string;
+      capacity: number;
+      registrationUrl: string;
+      registered: number;
+      checkedIn: number;
+      programs: Program[];
+      tables: Table[];
+    };
+
+    const raw = document.querySelector<HTMLScriptElement>('#signage-data')?.textContent ?? '[]';
+    const events: SignageEvent[] = JSON.parse(raw);
+
+    const todayIso = () => {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    };
+
+    function pickEvent(): SignageEvent | null {
+      const requested = new URLSearchParams(location.search).get('event');
+      if (requested) return events.find((e) => e.id === requested) ?? null;
+
+      const today = todayIso();
+      const onToday = events.find((e) => e.date === today);
+      if (onToday) return onToday;
+
+      const upcoming = events
+        .filter((e) => e.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return upcoming[0] ?? events[0] ?? null;
+    }
+
+    const minutesOf = (hhmm: string) => {
+      const [h, m] = hhmm.split(':').map(Number);
+      return (h ?? 0) * 60 + (m ?? 0);
+    };
+
+    const text = (selector: string, value: string) => {
+      const el = document.querySelector(selector);
+      if (el) el.textContent = value;
+    };
+
+    const event = pickEvent();
+
+    function renderStatic(ev: SignageEvent) {
+      text('#event-title', ev.title);
+      const [, m, d] = ev.date.split('-');
+      text('#event-date', `${Number(m)}月${Number(d)}日 ・ ${ev.venue}`);
+      text('#stat-checkedin', String(ev.checkedIn));
+      text('#stat-registered', String(ev.registered));
+      text('#stat-capacity', String(ev.capacity));
+
+      const list = document.querySelector('#tables');
+      if (list) {
+        list.innerHTML = '';
+        for (const table of ev.tables) {
+          const li = document.createElement('li');
+          li.innerHTML = `<span class="tables__name"></span><span class="tables__seats"></span><span class="tables__desc"></span>`;
+          li.querySelector('.tables__name')!.textContent = table.name;
+          li.querySelector('.tables__seats')!.textContent = `${table.seats}席`;
+          li.querySelector('.tables__desc')!.textContent = table.description;
+          list.append(li);
+        }
+      }
+
+      if (ev.registrationUrl) {
+        text('#signage-cta', '参加登録はこのQR / リポジトリのIssueから');
+      }
+    }
+
+    function renderNow(ev: SignageEvent) {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      const current = ev.programs.find(
+        (p) => minutesOf(p.startAt) <= nowMinutes && nowMinutes < minutesOf(p.endAt),
+      );
+      const next = ev.programs
+        .filter((p) => minutesOf(p.startAt) > nowMinutes)
+        .sort((a, b) => minutesOf(a.startAt) - minutesOf(b.startAt))[0];
+
+      text('#now-name', current?.name ?? 'FREE TIME');
+      text('#now-time', current ? `${current.startAt} – ${current.endAt}` : '出入り自由・ご歓談中');
+      text('#now-desc', current?.description ?? '');
+      text('#next-name', next?.name ?? '—');
+      text('#next-time', next ? `${next.startAt}〜` : '');
+
+      const pad = (n: number) => String(n).padStart(2, '0');
+      text('#clock', `${pad(now.getHours())}:${pad(now.getMinutes())}`);
+      text('#clock-sec', `:${pad(now.getSeconds())}`);
+    }
+
+    if (event) {
+      renderStatic(event);
+      renderNow(event);
+      setInterval(() => renderNow(event), 1000);
+    } else {
+      text('#event-title', '開催予定がありません');
+    }
+  </script>
+
+  <style>
+    .signage-screen {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: clamp(1rem, 2vh, 2rem);
+      padding: clamp(1rem, 3vh, 2.5rem) clamp(1.5rem, 3vw, 3rem);
+    }
+    .signage-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: clamp(0.5rem, 1.5vh, 1.25rem);
+    }
+    .signage-kicker {
+      margin: 0;
+      color: var(--color-accent);
+      letter-spacing: 0.22em;
+      font-size: 0.7em;
+      text-transform: uppercase;
+    }
+    .signage-top h1 {
+      margin: 0.15em 0 0;
+      font-size: clamp(1.6rem, 3.4vw, 3.4rem);
+    }
+    .signage-sub {
+      margin: 0.2em 0 0;
+      color: var(--color-text-muted);
+    }
+    .signage-clock {
+      font-variant-numeric: tabular-nums;
+      font-weight: 200;
+      line-height: 1;
+      display: flex;
+      align-items: baseline;
+      color: var(--color-text);
+    }
+    .signage-clock span:first-child {
+      font-size: clamp(2.5rem, 6vw, 6rem);
+    }
+    .signage-clock__sec {
+      font-size: clamp(1rem, 2vw, 2rem);
+      color: var(--color-text-dim);
+    }
+
+    .signage-body {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      grid-template-rows: 1fr auto;
+      gap: clamp(1rem, 2vw, 2rem);
+      min-height: 0;
+    }
+    .panel {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: clamp(1rem, 2vw, 2rem);
+      min-height: 0;
+      overflow: hidden;
+    }
+    .panel--now {
+      grid-row: span 2;
+      display: flex;
+      flex-direction: column;
+      border-color: var(--color-accent-dim);
+      background: linear-gradient(160deg, #221c12 0%, var(--color-surface) 60%);
+    }
+    .panel__title {
+      margin: 0 0 0.6em;
+      font-size: 0.75em;
+      letter-spacing: 0.3em;
+      color: var(--color-accent);
+    }
+    .panel__label {
+      font-size: 0.7em;
+      letter-spacing: 0.24em;
+      color: var(--color-text-dim);
+      margin-right: 0.8em;
+    }
+    .now__name {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 5rem);
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .now__time {
+      margin: 0.3em 0 0;
+      color: var(--color-accent-strong);
+      font-size: clamp(1rem, 1.8vw, 2rem);
+      font-variant-numeric: tabular-nums;
+    }
+    .now__desc {
+      margin: 0.6em 0 0;
+      color: var(--color-text-muted);
+      max-width: 34ch;
+    }
+    .now__next {
+      margin-top: auto;
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      align-items: baseline;
+      gap: 0.6em;
+      flex-wrap: wrap;
+    }
+
+    /*
+     * 卓のリストは JS で生成する。Astro のスコープ付きCSSはビルド時に静的な要素へ
+     * data-astro-cid-* を付けて効かせる仕組みなので、動的に作った要素には当たらない。
+     * 静的な .tables を起点に :global() で子孫を指定する。
+     */
+    .tables {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6em;
+    }
+    .tables :global(li) {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0 0.8em;
+      padding-bottom: 0.5em;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .tables :global(.tables__name) {
+      font-weight: 700;
+    }
+    .tables :global(.tables__seats) {
+      color: var(--color-accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .tables :global(.tables__desc) {
+      grid-column: 1 / -1;
+      color: var(--color-text-dim);
+      font-size: 0.8em;
+      line-height: 1.4;
+    }
+
+    .stats {
+      display: flex;
+      gap: clamp(1rem, 2vw, 2.5rem);
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat__value {
+      font-size: clamp(1.8rem, 3.4vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat__label {
+      font-size: 0.65em;
+      letter-spacing: 0.18em;
+      color: var(--color-text-dim);
+    }
+    .award-strip {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em 1.2em;
+      margin: 1em 0 0;
+      padding: 0;
+      color: var(--color-text-muted);
+      font-size: 0.8em;
+    }
+    .award-strip li {
+      display: flex;
+      gap: 0.35em;
+    }
+
+    .signage-bottom {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-4);
+      border-top: 1px solid var(--color-border);
+      padding-top: clamp(0.5rem, 1.5vh, 1rem);
+    }
+    .signage-bottom p {
+      margin: 0;
+    }
+
+    @media (max-aspect-ratio: 1/1) {
+      .signage-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        overflow-y: auto;
+      }
+      .panel--now {
+        grid-row: auto;
+      }
+    }
+  </style>
+</SignageLayout>

@@ -1,0 +1,139 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EventCard from '../components/EventCard.astro';
+import ChallengeCard from '../components/ChallengeCard.astro';
+import { getNextEvent, getPastEvents, getPublishedChallenges } from '../lib/data';
+import { formatDate } from '../lib/format';
+import { href } from '../lib/url';
+
+const nextEvent = await getNextEvent();
+const pastEvents = (await getPastEvents()).slice(0, 3);
+const latestChallenges = (await getPublishedChallenges()).slice(0, 3);
+---
+
+<BaseLayout title="ホーム">
+  <section class="hero stack">
+    <p class="hero__tagline">調和とコードが響き合う、大人の夜。</p>
+    <h1>Hacker's Bar @ Onarimon PIANOMA</h1>
+    <p class="muted hero__lead">
+      世界三大ピアノの名器 C.BECHSTEIN が佇む空間で、お酒を片手にAIとコードを語り、手を動かす
+      オープンコミュニティ。入退室自由、初心者からエキスパートまでフラットに。
+    </p>
+  </section>
+
+  <section class="stack">
+    <h2>次回開催</h2>
+    {
+      nextEvent ? (
+        <div class="card next-event">
+          <div class="next-event__body stack">
+            <p class="next-event__date">{formatDate(nextEvent.data.date)}</p>
+            <h3>{nextEvent.data.title}</h3>
+            <p class="muted">{nextEvent.data.summary}</p>
+            <p class="dim">
+              {nextEvent.data.doorsOpenAt} 開場 / {nextEvent.data.startAt}–{nextEvent.data.endAt} ・{' '}
+              {nextEvent.data.venue.name}（{nextEvent.data.venue.nearestStation}）・ 定員{' '}
+              {nextEvent.data.capacity}名
+            </p>
+          </div>
+          <div class="next-event__actions">
+            <a class="button" href={href(`/events/${nextEvent.id}`)}>
+              プログラムを見る
+            </a>
+            {nextEvent.data.registrationUrl && (
+              <a class="button" data-variant="ghost" href={nextEvent.data.registrationUrl}>
+                参加登録する
+              </a>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p class="muted">
+          次回の開催はまだ確定していません。決まり次第ここに出ます（
+          <a href={href('/events')}>過去の開催はこちら</a>）。
+        </p>
+      )
+    }
+  </section>
+
+  <section class="stack">
+    <div class="section-head">
+      <h2>最近の開催</h2>
+      <a href={href('/events')}>すべて見る →</a>
+    </div>
+    <div class="grid">
+      {pastEvents.map((event) => <EventCard event={event} />)}
+    </div>
+  </section>
+
+  <section class="stack">
+    <div class="section-head">
+      <h2>AI課題DB</h2>
+      <a href={href('/challenges')}>すべて見る →</a>
+    </div>
+    <p class="muted">
+      早押しバトルで出題したお題と模範回答のアーカイブ。自分で解いても、次回のお題を投稿しても。
+    </p>
+    <div class="grid">
+      {latestChallenges.map((challenge) => <ChallengeCard challenge={challenge} />)}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    margin-bottom: var(--space-10);
+  }
+  .hero__tagline {
+    color: var(--color-accent);
+    letter-spacing: 0.14em;
+    font-size: var(--text-sm);
+    margin: 0;
+  }
+  .hero h1 {
+    font-size: var(--text-4xl);
+    margin: 0;
+  }
+  .hero__lead {
+    max-width: 44rem;
+  }
+  section + section {
+    margin-top: var(--space-10);
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+  .section-head h2 {
+    margin: 0;
+  }
+  .next-event {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+    border-color: var(--color-accent-dim);
+  }
+  .next-event__body {
+    flex: 1 1 24rem;
+  }
+  .next-event__body h3 {
+    margin: 0;
+    font-size: var(--text-2xl);
+  }
+  .next-event__body p {
+    margin: 0;
+  }
+  .next-event__date {
+    color: var(--color-accent-strong);
+    font-weight: 700;
+  }
+  .next-event__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+</style>

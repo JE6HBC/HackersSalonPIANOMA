@@ -1,0 +1,55 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { CATEGORY_LABELS, LEVEL_LABELS, formatMinutes } from '../lib/format';
+import { href } from '../lib/url';
+
+interface Props {
+  challenge: CollectionEntry<'challenges'>;
+}
+
+const { challenge } = Astro.props;
+const { data } = challenge;
+---
+
+<article class="card challenge-card" data-level={data.level} data-category={data.category}>
+  <div class="challenge-card__meta">
+    <span class="badge">{LEVEL_LABELS[data.level]}</span>
+    <span class="badge">{CATEGORY_LABELS[data.category]}</span>
+    <span class="dim">制限 {formatMinutes(data.timeLimitSec)}</span>
+  </div>
+  <h3 class="challenge-card__title">
+    <a href={href(`/challenges/${challenge.id}`)}>{data.title}</a>
+  </h3>
+  <p class="dim">
+    {data.id}
+    {data.usedIn.length > 0 && ` ・ 出題: ${data.usedIn.join(', ')}`}
+  </p>
+</article>
+
+<style>
+  .challenge-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .challenge-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .challenge-card__title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+  .challenge-card__title a {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+  .challenge-card__title a:hover {
+    color: var(--color-accent-strong);
+  }
+  .challenge-card p {
+    margin: 0;
+  }
+</style>

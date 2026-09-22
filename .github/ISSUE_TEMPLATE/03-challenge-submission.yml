@@ -1,0 +1,79 @@
+name: 🧠 AI課題の投稿
+description: 早押しバトルなどで使うお題を提案します
+title: '[課題] '
+labels: ['challenge']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        自分で Pull Request を出せる方は `data/challenges/` に直接追加してください
+        （`npm run new:challenge -- my-slug` で雛形が作れます）。
+        このIssueは「アイデアだけ出したい」「PRの出し方が分からない」ときの入口です。
+
+  - type: input
+    id: title
+    attributes:
+      label: お題のタイトル
+      placeholder: 'CSVをMarkdown表に変換せよ'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: level
+    attributes:
+      label: 想定レベル
+      options:
+        - beginner（初級）
+        - intermediate（中級）
+        - advanced（上級）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: カテゴリ
+      options:
+        - prompt-engineering
+        - coding
+        - debugging
+        - refactoring
+        - security
+        - data
+        - design
+    validations:
+      required: true
+
+  - type: input
+    id: time-limit
+    attributes:
+      label: 制限時間（分）
+      placeholder: '5'
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 問題文
+      description: AIに丸投げしても曖昧にならない粒度で書いてください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: answer
+    attributes:
+      label: 模範回答と解説
+      description: 「なぜそうなるか」「どんなプロンプトで辿り着けるか」まで書けると最高です。
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: license
+    attributes:
+      label: ライセンス
+      options:
+        - label: この課題を CC BY 4.0 でリポジトリに収録することに同意します
+          required: true
+        - label: 業務上の機密情報・他者の著作物をそのまま含んでいません
+          required: true

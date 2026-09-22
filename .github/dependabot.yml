@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      # まとめて1本のPRにする。個別に飛んでくるとレビューが追いつかないため。
+      all-dependencies:
+        patterns: ['*']
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly

@@ -1,0 +1,28 @@
+{
+  "eventId": "2026-09-22",
+  "name": "早押しAIコード生成バトル vol.1",
+  "format": "speed-coding",
+  "status": "finished",
+  "defaultRoundSec": 300,
+  "defaultBreakSec": 120,
+  "rounds": [
+    {
+      "no": 1,
+      "name": "予選 第1問",
+      "durationSec": 300,
+      "breakAfterSec": 120,
+      "challengeId": "2026-001-csv-to-markdown"
+    },
+    {
+      "no": 2,
+      "name": "決勝",
+      "durationSec": 420,
+      "breakAfterSec": 0,
+      "challengeId": "2026-002-flaky-test-hunt"
+    }
+  ],
+  "entries": [
+    { "participantId": "p-2026-09-22-001", "tableId": "bring-your-own", "seat": 1 },
+    { "participantId": "p-2026-09-22-002", "tableId": "bring-your-own", "seat": 2 }
+  ]
+}

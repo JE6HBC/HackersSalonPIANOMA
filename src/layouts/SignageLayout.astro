@@ -1,0 +1,40 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} | Hacker's salon @ PIANOMA</title>
+    <meta name="robots" content="noindex" />
+  </head>
+  <body class="signage">
+    <slot />
+    <style is:global>
+      /*
+       * 会場の大型スクリーン専用レイアウト。
+       * 前提: 1920x1080 前後、視距離 3〜8m、部屋は暗い。
+       * よって最小文字サイズは 24px 相当、本文コントラストは白に寄せる。
+       */
+      body.signage {
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        background: radial-gradient(circle at 50% 0%, #1b1714 0%, var(--color-bg) 65%);
+        font-size: clamp(1rem, 1.4vw, 1.6rem);
+      }
+      body.signage h1,
+      body.signage h2 {
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </body>
+</html>

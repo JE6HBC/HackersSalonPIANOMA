@@ -1,0 +1,46 @@
+name: 💡 企画・機能の提案
+description: 新しいコーナー、競技ルール、システムの機能を提案します
+title: '[提案] '
+labels: ['proposal']
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 種類
+      options:
+        - イベントの企画・コーナー
+        - 競技ルール（早押しバトル等）
+        - システムの機能
+        - 運営フロー・ドキュメント
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解きたい課題
+      description: 「何が不便か」から書いてください。解決案から書くと議論が狭まります。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 検討した別案（任意）
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: 実装
+      options:
+        - label: 自分で実装してPRを出せます
+        - label: 一緒にやってくれる人を探しています

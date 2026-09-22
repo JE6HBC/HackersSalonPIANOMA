@@ -1,0 +1,25 @@
+{
+  "eventId": "2026-09-22",
+  "participants": [
+    {
+      "id": "p-2026-09-22-001",
+      "displayName": "サンプル太郎",
+      "github": "",
+      "role": "guest",
+      "joinedVia": "online",
+      "status": "checked-in",
+      "interests": ["LLM", "Web"],
+      "wantsLT": false
+    },
+    {
+      "id": "p-2026-09-22-002",
+      "displayName": "サンプル花子",
+      "github": "",
+      "role": "speaker",
+      "joinedVia": "online",
+      "status": "checked-in",
+      "interests": ["UI/UX"],
+      "wantsLT": true
+    }
+  ]
+}

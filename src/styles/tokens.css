@@ -1,0 +1,57 @@
+/*
+ * デザイントークン。色・余白・文字サイズはここだけで定義する。
+ * コンポーネント側で生の色コード（#rrggbb）を書かないこと。
+ * 追加するときは「何に使う色か」で名前を付ける（例: --color-accent であって --color-amber ではない）。
+ */
+:root {
+  /* 背景・面 */
+  --color-bg: #0e0d0c;
+  --color-surface: #191715;
+  --color-surface-raised: #23201d;
+  --color-border: #34302b;
+
+  /* 文字 */
+  --color-text: #f2ece3;
+  --color-text-muted: #a89e91;
+  --color-text-dim: #726a60;
+
+  /* アクセント（琥珀＝ウイスキー / 真鍮＝ピアノ） */
+  --color-accent: #d9a441;
+  --color-accent-strong: #f0bd5c;
+  --color-accent-dim: #6b5222;
+
+  /* 状態 */
+  --color-live: #e0524a;
+  --color-ok: #6fbf73;
+  --color-warn: #e0a24a;
+
+  /* タイポグラフィ */
+  --font-sans:
+    'Helvetica Neue', 'Hiragino Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'SFMono-Regular', Menlo, Consolas, 'Noto Sans Mono', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+
+  /* 余白（4pxグリッド） */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --space-10: 4rem;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  --content-width: 76rem;
+}

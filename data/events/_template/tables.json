@@ -1,0 +1,21 @@
+{
+  "eventId": "YYYY-MM-DD",
+  "tables": [
+    {
+      "id": "concierge",
+      "name": "AIコンシェルジュ卓",
+      "kind": "free",
+      "seats": 4,
+      "hosts": [],
+      "description": "困ったらまずここへ。"
+    },
+    {
+      "id": "bring-your-own",
+      "name": "持ち込み課題卓",
+      "kind": "free",
+      "seats": 6,
+      "hosts": [],
+      "description": "自作アプリ・業務課題を持ち込んで一緒に潰す卓。"
+    }
+  ]
+}

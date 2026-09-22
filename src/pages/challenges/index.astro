@@ -1,0 +1,110 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ChallengeCard from '../../components/ChallengeCard.astro';
+import { getPublishedChallenges } from '../../lib/data';
+import { CATEGORY_LABELS, LEVEL_LABELS } from '../../lib/format';
+
+const challenges = await getPublishedChallenges();
+const levels = [...new Set(challenges.map((c) => c.data.level))];
+const categories = [...new Set(challenges.map((c) => c.data.category))];
+---
+
+<BaseLayout title="AI課題DB" description="早押しバトルのお題と模範回答のアーカイブ。">
+  <h1>AI課題DB</h1>
+  <p class="muted">
+    イベントで出題したお題と模範回答のアーカイブです。全{challenges.length}問。 新しいお題の投稿は <code
+      >data/challenges/</code
+    > へのPull Request、または Issueテンプレート「AI課題の投稿」から。
+  </p>
+
+  <div class="filters card">
+    <label>
+      <span class="dim">レベル</span>
+      <select id="filter-level">
+        <option value="">すべて</option>
+        {levels.map((level) => <option value={level}>{LEVEL_LABELS[level]}</option>)}
+      </select>
+    </label>
+    <label>
+      <span class="dim">カテゴリ</span>
+      <select id="filter-category">
+        <option value="">すべて</option>
+        {
+          categories.map((category) => (
+            <option value={category}>{CATEGORY_LABELS[category]}</option>
+          ))
+        }
+      </select>
+    </label>
+    <p class="dim" id="filter-count" aria-live="polite"></p>
+  </div>
+
+  <div class="grid" id="challenge-list">
+    {challenges.map((challenge) => <ChallengeCard challenge={challenge} />)}
+  </div>
+
+  <p class="dim empty" id="challenge-empty" hidden>条件に合う課題がありません。</p>
+</BaseLayout>
+
+<script>
+  const levelSelect = document.querySelector<HTMLSelectElement>('#filter-level');
+  const categorySelect = document.querySelector<HTMLSelectElement>('#filter-category');
+  const list = document.querySelector<HTMLElement>('#challenge-list');
+  const empty = document.querySelector<HTMLElement>('#challenge-empty');
+  const count = document.querySelector<HTMLElement>('#filter-count');
+
+  if (levelSelect && categorySelect && list && empty && count) {
+    const cards = [...list.querySelectorAll<HTMLElement>('[data-level]')];
+
+    const apply = () => {
+      const level = levelSelect.value;
+      const category = categorySelect.value;
+      let visible = 0;
+
+      for (const card of cards) {
+        const match =
+          (!level || card.dataset.level === level) &&
+          (!category || card.dataset.category === category);
+        card.hidden = !match;
+        if (match) visible++;
+      }
+
+      empty.hidden = visible > 0;
+      count.textContent = `${visible} / ${cards.length} 問を表示中`;
+    };
+
+    levelSelect.addEventListener('change', apply);
+    categorySelect.addEventListener('change', apply);
+    apply();
+  }
+</script>
+
+<style>
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-5);
+    margin-bottom: var(--space-5);
+  }
+  .filters label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .filters select {
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+    font-family: inherit;
+    font-size: var(--text-base);
+  }
+  .filters p {
+    margin: 0 0 var(--space-2);
+  }
+  .empty {
+    margin-top: var(--space-5);
+  }
+</style>

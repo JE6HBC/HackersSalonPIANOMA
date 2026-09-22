@@ -1,0 +1,133 @@
+---
+import '../styles/global.css';
+import { href } from '../lib/url';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'お酒とAIとコードが交差する、大人のためのハッカーズバー。' } =
+  Astro.props;
+
+const nav = [
+  { label: 'ホーム', path: '/' },
+  { label: '開催予定・アーカイブ', path: '/events' },
+  { label: 'AI課題DB', path: '/challenges' },
+  { label: '殿堂', path: '/awards' },
+];
+
+const current = Astro.url.pathname.replace(/\/$/, '');
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} | Hacker's salon @ PIANOMA</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <a class="site-header__brand" href={href('/')}>
+          <span class="site-header__mark">🍸</span>
+          <span>Hacker's salon <span class="muted">@ PIANOMA</span></span>
+        </a>
+        <nav aria-label="メインナビゲーション">
+          <ul class="site-nav">
+            {
+              nav.map((item) => {
+                const target = href(item.path).replace(/\/$/, '');
+                const isCurrent = target === current;
+                return (
+                  <li>
+                    <a href={href(item.path)} aria-current={isCurrent ? 'page' : undefined}>
+                      {item.label}
+                    </a>
+                  </li>
+                );
+              })
+            }
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container site-main">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container stack">
+        <p class="dim">
+          このサイトは <a href="https://github.com/JE6HBC/HackersSalonPIANOMA">GitHubリポジトリ</a>
+          から自動生成されています。内容の追加・修正はPull Requestで歓迎します。
+        </p>
+        <p class="dim">
+          会場: PIANOMA（都営三田線「御成門駅」徒歩2分） / 会場スタッフ用:
+          <a href={href('/signage')}>サイネージ</a> ・ <a href={href('/admin')}>運営コンソール</a>
+        </p>
+      </div>
+    </footer>
+
+    <style>
+      .site-header {
+        border-bottom: 1px solid var(--color-border);
+        background: color-mix(in srgb, var(--color-bg) 92%, black);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(6px);
+      }
+      .site-header__inner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding-block: var(--space-3);
+      }
+      .site-header__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        color: var(--color-text);
+        text-decoration: none;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .site-header__mark {
+        font-size: var(--text-xl);
+      }
+      .site-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: var(--text-sm);
+      }
+      .site-nav a {
+        color: var(--color-text-muted);
+        text-decoration: none;
+      }
+      .site-nav a:hover,
+      .site-nav a[aria-current='page'] {
+        color: var(--color-accent-strong);
+      }
+      .site-main {
+        padding-block: var(--space-8);
+        min-height: 60vh;
+      }
+      .site-footer {
+        border-top: 1px solid var(--color-border);
+        padding-block: var(--space-6);
+        margin-top: var(--space-10);
+      }
+    </style>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import EventCard from '../../components/EventCard.astro';
+import { getPublishedEvents } from '../../lib/data';
+
+const events = await getPublishedEvents();
+const upcoming = events
+  .filter((e) => e.data.status === 'upcoming' || e.data.status === 'ongoing')
+  .sort((a, b) => a.data.date.localeCompare(b.data.date));
+const archived = events.filter((e) => e.data.status === 'archived');
+const cancelled = events.filter((e) => e.data.status === 'cancelled');
+---
+
+<BaseLayout title="開催予定・アーカイブ">
+  <h1>開催予定・アーカイブ</h1>
+  <p class="muted">
+    1回の開催が <code>data/events/YYYY-MM-DD/</code> の1ディレクトリに対応しています。 開催レポートの追記や誤りの修正はPull
+    Requestで受け付けています。
+  </p>
+
+  <section class="stack">
+    <h2>開催予定</h2>
+    {
+      upcoming.length > 0 ? (
+        <div class="grid">
+          {upcoming.map((event) => (
+            <EventCard event={event} />
+          ))}
+        </div>
+      ) : (
+        <p class="muted">現在、確定している開催予定はありません。</p>
+      )
+    }
+  </section>
+
+  <section class="stack">
+    <h2>アーカイブ</h2>
+    <div class="grid">
+      {archived.map((event) => <EventCard event={event} />)}
+    </div>
+  </section>
+
+  {
+    cancelled.length > 0 && (
+      <section class="stack">
+        <h2>中止された回</h2>
+        <div class="grid">
+          {cancelled.map((event) => (
+            <EventCard event={event} />
+          ))}
+        </div>
+      </section>
+    )
+  }
+</BaseLayout>
+
+<style>
+  section + section {
+    margin-top: var(--space-8);
+  }
+</style>

@@ -1,0 +1,77 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { formatDate, STATUS_LABELS } from '../lib/format';
+import { href } from '../lib/url';
+
+interface Props {
+  event: CollectionEntry<'events'>;
+}
+
+const { event } = Astro.props;
+const { data } = event;
+const tone =
+  data.status === 'ongoing' ? 'live' : data.status === 'upcoming' ? 'upcoming' : undefined;
+---
+
+<article class="card event-card">
+  <div class="event-card__head">
+    <span class="badge" data-tone={tone}>{STATUS_LABELS[data.status]}</span>
+    <time datetime={data.date} class="event-card__date">{formatDate(data.date)}</time>
+  </div>
+  <h3 class="event-card__title">
+    <a href={href(`/events/${event.id}`)}>{data.title}</a>
+  </h3>
+  <p class="muted">{data.summary}</p>
+  <p class="dim">
+    {data.doorsOpenAt} 開場 / {data.startAt}–{data.endAt} ・ 定員 {data.capacity}名
+  </p>
+  {
+    data.tags.length > 0 && (
+      <ul class="event-card__tags">
+        {data.tags.map((tag) => (
+          <li class="badge">{tag}</li>
+        ))}
+      </ul>
+    )
+  }
+</article>
+
+<style>
+  .event-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .event-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .event-card__date {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+  .event-card__title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+  .event-card__title a {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+  .event-card__title a:hover {
+    color: var(--color-accent-strong);
+  }
+  .event-card p {
+    margin: 0;
+  }
+  .event-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    list-style: none;
+    margin: var(--space-2) 0 0;
+    padding: 0;
+  }
+</style>

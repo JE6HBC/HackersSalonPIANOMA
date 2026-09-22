@@ -1,0 +1,65 @@
+name: 🍸 参加登録
+description: 次回イベントへの参加を登録します（GitHubアカウントが必要です）
+title: '[参加登録] '
+labels: ['participant-registration']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        参加登録ありがとうございます。入力内容は**公開リポジトリ**に記録されます。
+        本名・メールアドレス・電話番号は書かないでください。ハンドルネームで大丈夫です。
+
+        入力後、自動でPull Requestが作られ、運営が確認してマージします。
+
+  - type: input
+    id: event
+    attributes:
+      label: 参加する回（YYYY-MM-DD）
+      description: 開催予定の日付。分からなければ https://je6hbc.github.io/HackersSalonPIANOMA/events を見てください。
+      placeholder: '2026-10-22'
+    validations:
+      required: true
+
+  - type: input
+    id: display-name
+    attributes:
+      label: 表示名（ハンドル・ニックネーム）
+      description: 当日のサイネージや受賞記録に表示される名前です。40文字まで。
+      placeholder: 'ゆき'
+    validations:
+      required: true
+
+  - type: input
+    id: interests
+    attributes:
+      label: 興味のある分野
+      description: カンマ区切りで最大5つまで。当日の席決めやメンターの割り当ての参考にします。
+      placeholder: 'LLM, Web, セキュリティ'
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: lt
+    attributes:
+      label: ライトニングトーク
+      options:
+        - label: LTで話したい
+          required: false
+
+  - type: textarea
+    id: bring
+    attributes:
+      label: 持ち込みたい課題（任意）
+      description: 当日AIや参加者と一緒に潰したい課題があれば。機密情報は書かないでください。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: 確認
+      options:
+        - label: 表示名がこの公開リポジトリに記録されることに同意します
+          required: true
+        - label: 本名・連絡先・勤務先などの個人情報を書いていません
+          required: true

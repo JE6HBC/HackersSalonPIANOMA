@@ -1,0 +1,16 @@
+# レビュー担当の既定値。ここに書かれたパスのPRには自動でレビュー依頼が飛ぶ。
+# 書き換えたい場合は CONTRIBUTING.md の「レビュー」も合わせて更新すること。
+
+# 既定
+*                           @JE6HBC
+
+# ルール・土台にあたるファイルは特に慎重に
+/CONTRIBUTING.md            @JE6HBC
+/CODE_OF_CONDUCT.md         @JE6HBC
+/docs/policy/              @JE6HBC
+/docs/adr/                 @JE6HBC
+/.github/                  @JE6HBC
+/src/content.config.ts     @JE6HBC
+
+# コンテンツはレビューを軽くしたいので、将来コミュニティのメンテナを足す想定
+/data/challenges/          @JE6HBC

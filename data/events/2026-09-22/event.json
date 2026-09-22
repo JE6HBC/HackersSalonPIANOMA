@@ -1,0 +1,46 @@
+{
+  "id": "2026-09-22",
+  "title": "Hacker's Bar @ PIANOMA vol.6",
+  "status": "archived",
+  "date": "2026-09-22",
+  "doorsOpenAt": "19:00",
+  "startAt": "19:30",
+  "endAt": "23:00",
+  "venue": {
+    "name": "PIANOMA",
+    "nearestStation": "都営三田線「御成門駅」徒歩2分",
+    "mapUrl": "https://maps.google.com/?q=PIANOMA"
+  },
+  "capacity": 30,
+  "fee": { "amount": 2000, "currency": "JPY", "note": "1ドリンク付き" },
+  "summary": "初の「早押しAIコード生成バトル」開催回。バイブコーディングLTつき。",
+  "registrationUrl": "",
+  "programs": [
+    {
+      "id": "concierge",
+      "name": "AIコンシェルジュコーナー",
+      "startAt": "19:30",
+      "endAt": "23:00",
+      "owner": "",
+      "description": "AIメンターが常駐。プロンプト・エラー解消・ツール選定なんでも相談。"
+    },
+    {
+      "id": "battle",
+      "name": "早押しAIコード生成バトル",
+      "startAt": "21:00",
+      "endAt": "22:00",
+      "owner": "",
+      "description": "スクリーンにお題を投影し、制限時間内のAI活用度を競う。"
+    },
+    {
+      "id": "lt",
+      "name": "アイデアLT",
+      "startAt": "22:00",
+      "endAt": "22:40",
+      "owner": "",
+      "description": "1人5分のショートプレゼン。"
+    }
+  ],
+  "tags": ["早押しバトル", "LT"],
+  "links": []
+}

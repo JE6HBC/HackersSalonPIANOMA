@@ -1,0 +1,39 @@
+{
+  "awards": [
+    {
+      "id": "speed-king",
+      "name": "スピードキング",
+      "emoji": "⚡",
+      "description": "早押しAIコード生成バトルの優勝者に贈られる称号。",
+      "category": "tournament"
+    },
+    {
+      "id": "best-lt",
+      "name": "ベストLT賞",
+      "emoji": "🎤",
+      "description": "その回で最も会場を沸かせたライトニングトークに贈られる。",
+      "category": "talk"
+    },
+    {
+      "id": "best-hack",
+      "name": "ベストハック賞",
+      "emoji": "🛠",
+      "description": "持ち込み課題をその場で最も鮮やかに解決した人に贈られる。",
+      "category": "hack"
+    },
+    {
+      "id": "concierge-of-the-night",
+      "name": "今夜のコンシェルジュ",
+      "emoji": "🍸",
+      "description": "最も多くの参加者を助けたAIメンターに贈られる。",
+      "category": "community"
+    },
+    {
+      "id": "first-timer",
+      "name": "ファーストペンギン",
+      "emoji": "🐧",
+      "description": "初参加でいきなり手を動かした人に贈られる。",
+      "category": "community"
+    }
+  ]
+}

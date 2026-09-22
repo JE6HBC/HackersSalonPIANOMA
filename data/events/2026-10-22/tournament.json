@@ -1,0 +1,14 @@
+{
+  "eventId": "2026-10-22",
+  "name": "早押しAIコード生成バトル",
+  "format": "speed-coding",
+  "status": "scheduled",
+  "defaultRoundSec": 300,
+  "defaultBreakSec": 120,
+  "rounds": [
+    { "no": 1, "name": "予選 第1問", "durationSec": 300, "breakAfterSec": 120, "challengeId": "" },
+    { "no": 2, "name": "予選 第2問", "durationSec": 300, "breakAfterSec": 120, "challengeId": "" },
+    { "no": 3, "name": "決勝", "durationSec": 420, "breakAfterSec": 0, "challengeId": "" }
+  ],
+  "entries": []
+}

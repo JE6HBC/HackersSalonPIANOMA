@@ -1,0 +1,38 @@
+{
+  "id": "2026-10-22",
+  "title": "Hacker's Bar @ PIANOMA vol.7",
+  "status": "upcoming",
+  "date": "2026-10-22",
+  "doorsOpenAt": "19:00",
+  "startAt": "19:30",
+  "endAt": "23:00",
+  "venue": {
+    "name": "PIANOMA",
+    "nearestStation": "都営三田線「御成門駅」徒歩2分",
+    "mapUrl": "https://maps.google.com/?q=PIANOMA"
+  },
+  "capacity": 30,
+  "fee": { "amount": 2000, "currency": "JPY", "note": "1ドリンク付き" },
+  "summary": "テーマ未定。早押しバトル vol.2 と持ち込み課題ハッキングを予定。",
+  "registrationUrl": "https://github.com/JE6HBC/HackersSalonPIANOMA/issues/new?template=01-participant-registration.yml",
+  "programs": [
+    {
+      "id": "concierge",
+      "name": "AIコンシェルジュコーナー",
+      "startAt": "19:30",
+      "endAt": "23:00",
+      "owner": "",
+      "description": "AIメンターが常駐。プロンプト・エラー解消・ツール選定なんでも相談。"
+    },
+    {
+      "id": "battle",
+      "name": "早押しAIコード生成バトル vol.2",
+      "startAt": "21:00",
+      "endAt": "22:00",
+      "owner": "",
+      "description": "スクリーンにお題を投影し、制限時間内のAI活用度を競う。"
+    }
+  ],
+  "tags": ["早押しバトル"],
+  "links": []
+}

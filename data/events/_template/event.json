@@ -1,0 +1,30 @@
+{
+  "id": "YYYY-MM-DD",
+  "title": "Hacker's Bar @ PIANOMA vol.N",
+  "status": "upcoming",
+  "date": "YYYY-MM-DD",
+  "doorsOpenAt": "19:00",
+  "startAt": "19:30",
+  "endAt": "23:00",
+  "venue": {
+    "name": "PIANOMA",
+    "nearestStation": "都営三田線「御成門駅」徒歩2分",
+    "mapUrl": "https://maps.google.com/?q=PIANOMA"
+  },
+  "capacity": 30,
+  "fee": { "amount": 2000, "currency": "JPY", "note": "1ドリンク付き" },
+  "summary": "この回のテーマを1〜2文で。",
+  "registrationUrl": "",
+  "programs": [
+    {
+      "id": "concierge",
+      "name": "AIコンシェルジュコーナー",
+      "startAt": "19:30",
+      "endAt": "23:00",
+      "owner": "",
+      "description": "AIメンターが常駐。プロンプト・エラー解消・ツール選定なんでも相談。"
+    }
+  ],
+  "tags": [],
+  "links": []
+}

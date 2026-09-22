@@ -18,7 +18,7 @@ jobs:
     name: 検証（整形・データ・型・ビルド）
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:

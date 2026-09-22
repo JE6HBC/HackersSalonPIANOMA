@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+.astro/
+.output/
+
+# env / secrets — 絶対にコミットしない
+.env
+.env.*
+!.env.example
+
+# 個人情報を含む可能性のある作業ファイル（docs/policy/privacy.md 参照）
+*.private.json
+*.private.csv
+/private/
+/exports/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# logs
+*.log
+npm-debug.log*

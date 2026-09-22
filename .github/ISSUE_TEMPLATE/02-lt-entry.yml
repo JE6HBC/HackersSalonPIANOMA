@@ -1,0 +1,55 @@
+name: 🎤 LT登壇エントリー
+description: ライトニングトークで話したいネタを登録します
+title: '[LT] '
+labels: ['lt-entry']
+body:
+  - type: input
+    id: event
+    attributes:
+      label: 登壇したい回（YYYY-MM-DD）
+      placeholder: '2026-10-22'
+    validations:
+      required: true
+
+  - type: input
+    id: speaker
+    attributes:
+      label: 登壇者名（ハンドル）
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: タイトル
+      placeholder: '打鍵音とUXの話'
+    validations:
+      required: true
+
+  - type: textarea
+    id: abstract
+    attributes:
+      label: 概要
+      description: 3〜5行程度。聞き手が「自分に関係あるか」を判断できる書き方で。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: duration
+    attributes:
+      label: 希望時間
+      options:
+        - 5分
+        - 10分
+        - 15分
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: needs
+    attributes:
+      label: 必要な設備
+      options:
+        - label: スクリーン投影（HDMI）
+        - label: 音声出力
+        - label: ピアノ（C.BECHSTEIN）

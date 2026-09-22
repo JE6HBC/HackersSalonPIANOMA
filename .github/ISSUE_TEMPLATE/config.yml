@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 雑談・ゆるい相談
+    url: https://github.com/JE6HBC/HackersSalonPIANOMA/discussions
+    about: 形式にこだわらない相談はこちら（Discussionsが有効な場合）
+  - name: 📖 コントリビューションガイド
+    url: https://github.com/JE6HBC/HackersSalonPIANOMA/blob/main/CONTRIBUTING.md
+    about: どこに何を書けばいいか迷ったらまずこれ

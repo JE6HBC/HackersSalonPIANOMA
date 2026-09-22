@@ -1,0 +1,86 @@
+name: 参加登録Issueの取り込み
+
+# 参加登録のIssueが立ったら、その内容を data/events/<日付>/participants.json に反映する
+# Pull Request を自動で作る。マージするかどうかは運営が判断する（＝Issue本文は信用しない）。
+#
+# 前提となるリポジトリ設定:
+#   Settings → Actions → General → Workflow permissions で
+#   「Allow GitHub Actions to create and approve pull requests」を有効にすること。
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: registration-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: contains(github.event.issue.labels.*.name, 'participant-registration')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Issue本文を participants.json に反映
+        id: parse
+        # Issue本文はシェルに直接展開せず、必ず環境変数経由で渡す（コマンドインジェクション対策）
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: node scripts/issue-to-participant.mjs
+
+      - name: 取り込めなかった理由をIssueに返す
+        if: steps.parse.outputs.status == 'skipped'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REASON: ${{ steps.parse.outputs.reason }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "登録を取り込めませんでした: $REASON
+
+          Issue本文を直すと自動で再チェックされます。分からなければそのままお待ちください（運営が手動で対応します）。"
+
+      - name: データを検証
+        if: steps.parse.outputs.status == 'added'
+        run: |
+          npm ci
+          npm run validate:data
+
+      - name: Pull Request を作成
+        if: steps.parse.outputs.status == 'added'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_ID: ${{ steps.parse.outputs.event_id }}
+          DISPLAY_NAME: ${{ steps.parse.outputs.display_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          BRANCH="registration/${EVENT_ID}-issue-${ISSUE_NUMBER}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add "data/events/${EVENT_ID}/participants.json"
+          git commit -m "chore(data): add participant to ${EVENT_ID} (#${ISSUE_NUMBER})"
+          git push --force origin "$BRANCH"
+
+          if ! gh pr list --head "$BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
+            echo "既存のPRがあるので更新のみ"
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "参加登録: ${EVENT_ID} (#${ISSUE_NUMBER})" \
+            --body "$(printf 'Issue #%s の参加登録を反映します。\n\n- 対象: `data/events/%s/participants.json`\n- 表示名: %s\n\n内容を確認してからマージしてください。\n\nCloses #%s\n' "$ISSUE_NUMBER" "$EVENT_ID" "$DISPLAY_NAME" "$ISSUE_NUMBER")"

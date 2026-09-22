@@ -1,0 +1,52 @@
+name: 🐛 不具合の報告
+description: サイト・サイネージ・タイマーの不具合を報告します
+title: '[bug] '
+labels: ['bug']
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: どこで起きましたか
+      options:
+        - サイト（イベント一覧・課題DB・殿堂）
+        - 会場サイネージ（/signage）
+        - トーナメントタイマー（/signage/timer）
+        - 運営コンソール（/admin）
+        - データ（data/ の内容が間違っている）
+        - CI / デプロイ
+        - その他
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 何が起きましたか
+      description: 期待した動きと、実際に起きたことを分けて書いてください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. /signage/timer を開く
+        2. 開始を押す
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 環境
+      placeholder: 'macOS 15 / Chrome 130 / 会場のWindows機'
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        **当日その場で困っている場合**は、Issueより先に運営に声をかけてください。
+        イベント中の不具合対応は `docs/operations-runbook.md` の「困ったときの逃げ道」に従います。

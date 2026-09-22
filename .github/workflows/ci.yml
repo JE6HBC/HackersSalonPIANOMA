@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 必要最小限の権限だけ渡す（フォークからのPRでも安全に動くように）
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 検証（整形・データ・型・ビルド）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: 整形チェック（Prettier）
+        run: npm run format:check
+
+      - name: データ整合性チェック
+        run: npm run validate:data
+
+      - name: 型チェック（astro check）
+        run: npm run check
+
+      - name: ビルド
+        run: npm run build
